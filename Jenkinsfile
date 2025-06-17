@@ -21,7 +21,7 @@ pipeline {
         stage('Test') {
             steps {
                 // Run pytest and tee output so result.log is visible in Jenkins workspace
-                sh 'pytest test/test_app.py | tee $RESULT_LOG || true'
+                sh 'test/test_app.py | tee $RESULT_LOG || true'
             }
         }
 
