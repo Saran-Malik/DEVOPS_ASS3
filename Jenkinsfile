@@ -14,7 +14,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/Saran-Malik/DEVOPS_ASS3.git'
+                git branch: 'main', url: 'https://github.com/Saran-Malik/DEVOPS_ASS3.git'
             }
         }
 
