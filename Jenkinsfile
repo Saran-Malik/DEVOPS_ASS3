@@ -7,6 +7,10 @@ pipeline {
         githubPush()
     }
 
+    environment {
+        RESULT_LOG = 'result.log'
+    }
+
     stages {
         stage('Clone Repository') {
             steps {
@@ -16,7 +20,8 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'pytest test/test_app.py > result.log || true'
+                // Run pytest and tee output so result.log is visible in Jenkins workspace
+                sh 'pytest test/test_app.py | tee $RESULT_LOG || true'
             }
         }
 
@@ -31,7 +36,8 @@ pipeline {
 
         stage('Archive Results') {
             steps {
-                archiveArtifacts artifacts: 'result.log', allowEmptyArchive: true
+                // Safely archive the result log
+                archiveArtifacts artifacts: "${RESULT_LOG}", allowEmptyArchive: true
             }
         }
     }
@@ -39,12 +45,20 @@ pipeline {
     post {
         always {
             script {
-                def result = readFile('result.log')
-                emailext (
-                    subject: "Jenkins Test Result: ${currentBuild.fullDisplayName}",
-                    body: "Here are the test results:\n\n${result}",
-                    to: "${COMMITTER_EMAIL}"
-                )
+                // List files in workspace for debug (optional, helps confirm result.log is there)
+                sh 'ls -la'
+
+                // Check if result.log exists to prevent build failure
+                if (fileExists("${RESULT_LOG}")) {
+                    def result = readFile("${RESULT_LOG}")
+                    emailext (
+                        subject: "Jenkins Test Result: ${currentBuild.fullDisplayName}",
+                        body: "Here are the test results:\n\n${result}",
+                        to: "${COMMITTER_EMAIL}"
+                    )
+                } else {
+                    echo "WARNING: ${RESULT_LOG} not found. Skipping email notification."
+                }
             }
         }
     }
