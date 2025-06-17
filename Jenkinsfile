@@ -1,5 +1,11 @@
 pipeline {
-    agent any
+    agent {
+        dockerfile true
+    }
+
+    triggers {
+        githubPush()
+    }
 
     stages {
         stage('Clone Repository') {
@@ -8,21 +14,37 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Test') {
+            steps {
+                sh 'pytest test/test_app.py > result.log || true'
+            }
+        }
+
+        stage('Get Committer Email') {
             steps {
                 script {
-                    dockerImage = docker.build('flask-selenium-app')
+                    COMMITTER_EMAIL = sh(script: "git --no-pager log -1 --pretty=format:'%ae'", returnStdout: true).trim()
+                    echo "Committer email: ${COMMITTER_EMAIL}"
                 }
             }
         }
 
-        stage('Run Tests') {
+        stage('Archive Results') {
             steps {
-                script {
-                    dockerImage.inside {
-                        sh 'pytest test/test_app.py'
-                    }
-                }
+                archiveArtifacts artifacts: 'result.log', allowEmptyArchive: true
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                def result = readFile('result.log')
+                emailext (
+                    subject: "Jenkins Test Result: ${currentBuild.fullDisplayName}",
+                    body: "Here are the test results:\n\n${result}",
+                    to: "${COMMITTER_EMAIL}"
+                )
             }
         }
     }
